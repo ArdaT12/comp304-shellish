@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <termios.h> // termios, TCSANOW, ECHO, ICANON
 #include <unistd.h>
+#include <fcntl.h>
 const char *sysname = "shellish";
 
 enum return_codes {
@@ -338,10 +339,84 @@ int process_command(struct command_t *command) {
       return SUCCESS;
     }
   }
+  /////////////////////////////////////////
+  if (command->next != NULL) {
+
+    int pipefd[2];
+    if (pipe(pipefd) == -1) {
+        perror("pipe");
+        return UNKNOWN;
+    }
+
+    pid_t pid1 = fork();
+    if (pid1 == 0) { // First command
+        dup2(pipefd[1], STDOUT_FILENO);
+        close(pipefd[0]);
+        close(pipefd[1]);
+        if (strchr(command->name, '/'))
+            execv(command->name, command->args);
+        else
+            exec_with_path(command);
+        perror("exec first");
+        exit(127);
+    }
+
+    pid_t pid2 = fork();
+    if (pid2 == 0) { // Second command
+        dup2(pipefd[0], STDIN_FILENO);
+        close(pipefd[1]);
+        close(pipefd[0]);
+        if (strchr(command->next->name, '/'))
+            execv(command->next->name, command->next->args);
+        else
+            exec_with_path(command->next);
+        perror("exec second");
+        exit(127);
+    }
+
+    close(pipefd[0]);
+    close(pipefd[1]);
+
+    if (!command->background) {
+        waitpid(pid1, NULL, 0);
+        waitpid(pid2, NULL, 0);
+    } else {
+        printf("[background pipe %d %d]\n", pid1, pid2);
+    }
+
+    return SUCCESS;
+  }
+
   pid_t pid = fork();
   if (pid == 0) // child
-  {
-  ///////////////////////////////////////////////////////////////////////
+  {int fd = 0;
+    if (command->redirects[0]) {
+        fd = open(command->redirects[0], O_RDONLY);
+        if (fd == -1) {
+            perror("Input file");
+            exit(1);
+        }
+        dup2(fd, STDIN_FILENO);
+        close(fd);
+    }
+    if (command->redirects[1]) {
+        fd = open(command->redirects[1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd == -1) {
+            perror("Output file");
+            exit(1);
+        }
+        dup2(fd, STDOUT_FILENO); 
+        close(fd);
+    }
+    if (command->redirects[2]) {
+        fd = open(command->redirects[2], O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (fd == -1) {
+            perror("Append file");
+            exit(1);
+        }
+        dup2(fd, STDOUT_FILENO);
+        close(fd);
+    }
     /// This shows how to do exec with environ (but is not available on MacOs)
     // extern char** environ; // environment variables
     // execvpe(command->name, command->args, environ); // exec+args+path+environ
@@ -378,7 +453,7 @@ int process_command(struct command_t *command) {
 int main() {
   while (1) {
     struct command_t *command =
-        (struct command_t *)malloc(sizeof(struct command_t));
+       (struct command_t *)malloc(sizeof(struct command_t));
     memset(command, 0, sizeof(struct command_t)); // set all bytes to 0
 
     int code;
