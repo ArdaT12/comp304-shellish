@@ -30,19 +30,19 @@ $ ls -l &
 
 **Example:**
 
-# Redirect output to a file
+- Redirect output to a file
 $ ls -l >files.txt
 
-# Append output to a file
+- Append output to a file
 $ echo "Hello World" >>files.txt
 
-# Read input from a file
+- Read input from a file
 $ wc -l <files.txt
 
-# Piping between commands
+- Piping between commands
 $ cat files.txt | grep "Hello" | wc -l
 
-# Background process
+- Background process
 $ sleep 10 &
 
 ## Part III – FastMath – Custom Shell-ish Command
