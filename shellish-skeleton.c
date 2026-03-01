@@ -340,6 +340,43 @@ int process_command(struct command_t *command) {
     }
   }
   /////////////////////////////////////////
+  if (strcmp(command->name, "fastmath") == 0) {
+    if (command->arg_count != 4) {
+        printf("Usage: fastmath <num1> <operator> <num2>\n");
+        return SUCCESS;
+    }
+
+    double a = atof(command->args[1]);
+    double b = atof(command->args[3]);
+    char op = command->args[2][0];
+    double result;
+
+    switch (op) {
+        case '+':
+            result = a + b;
+            break;
+        case '-':
+            result = a - b;
+            break;
+        case '*':
+            result = a * b;
+            break;
+        case '/':
+            if (b == 0) {
+                printf("Error: division by zero\n");
+                return SUCCESS;
+            }
+            result = a / b;
+            break;
+        default:
+            printf("Error: unknown operator '%c'\n", op);
+            return SUCCESS;
+    }
+
+    printf("Result: %.2f\n", result);
+    return SUCCESS;
+  }
+
   if (command->next != NULL) {
 
     int pipefd[2];
